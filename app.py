@@ -17,19 +17,19 @@ class Base(DeclarativeBase):
 
 db = SQLAlchemy(model_class=Base)
 
-# create the app
-app = Flask(__name__)
+# Create the Flask app
+app = Flask(name)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# configure the database
+# Configure the database
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///typemitr.db")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
 }
 
-# initialize the app with the extension
+# Initialize DB
 db.init_app(app)
 
 with app.app_context():
@@ -54,12 +54,9 @@ def generate():
     
     if request.method == 'POST':
         try:
-            # Get form data
             document_type = request.form.get('document_type')
             language = request.form.get('language', 'english')
             tone = request.form.get('tone', 'formal')
-            
-            # Get input fields
             sender_name = request.form.get('sender_name', '').strip()
             recipient_name = request.form.get('recipient_name', '').strip()
             purpose = request.form.get('purpose', '').strip()
@@ -67,7 +64,6 @@ def generate():
             date_range = request.form.get('date_range', '').strip()
             additional_details = request.form.get('additional_details', '').strip()
             
-            # Validation
             if not all([document_type, sender_name, recipient_name, purpose]):
                 flash('Please fill in all required fields.', 'error')
                 return render_template('generate.html', 
@@ -75,7 +71,6 @@ def generate():
                                      document_info=DOCUMENT_TYPES.get(document_type, {}),
                                      form_data=request.form)
             
-            # Generate letter content using AI
             letter_content = generate_letter_content(
                 document_type=document_type,
                 language=language,
@@ -88,7 +83,6 @@ def generate():
                 additional_details=additional_details
             )
             
-            # Store in session for PDF generation
             session['generated_letter'] = {
                 'content': letter_content,
                 'document_type': document_type,
@@ -99,7 +93,7 @@ def generate():
             }
             
             return render_template('generate.html',
-                                 document_type=document_type,
+document_type=document_type,
                                  document_info=DOCUMENT_TYPES.get(document_type, {}),
                                  generated_content=letter_content,
                                  form_data=request.form)
@@ -120,7 +114,6 @@ def download_pdf():
             flash('No letter found. Please generate a letter first.', 'error')
             return redirect(url_for('index'))
         
-        # Generate PDF
         pdf_file = generate_pdf(generated_letter)
         
         filename = f"typemitr_{generated_letter['document_type'].replace(' ', '_').lower()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
@@ -140,6 +133,15 @@ def download_pdf():
 @app.errorhandler(404)
 def not_found(error):
     return render_template('index.html', document_types=DOCUMENT_TYPES), 404
+
+@app.errorhandler(500)
+def server_error(error):
+    flash('An internal server error occurred. Please try again.', 'error')
+    return render_template('index.html', document_types=DOCUMENT_TYPES), 500
+
+if name == 'main':
+    app.run(host='0.0.0.0', port=5000, debug=True)
+
 
 @app.errorhandler(500)
 def server_error(error):
