@@ -3,3 +3,4 @@ flask_sqlalchemy
 gunicorn
 openai
 requests
+reportlab
